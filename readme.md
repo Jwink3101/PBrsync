@@ -147,7 +147,8 @@ The automatic `config` file has instructions. They are also reproduced below:
 
 `PBrsync` is a python-wrapper around multiple rsync calls. By storing a snapshot of the past file-system and tracking inode numbers (and optionally, creation time) moves are detected and applied. For more detials, read the design notes.
 
-There is no interactivity. Based on the (self commented) config settings, you can either resolve conflicts by keeping the newest (and hopefully having backups on[^backnewest]), keeping both, or always keeping either local or remote.
+There is no interactivity. Based on the (self commented) config settings, you can either resolve conflicts by keeping the newest (and hopefully having backups on), keeping both, or always keeping either local or remote. If you don't have both local and remote backups on with the setting to only keep the newest, it will warn you and then wait 3 seconds
+
 
 For types of conflicts and how they are resolved, see [design notes](design_notes.md)
 
@@ -223,7 +224,7 @@ All logs are stored in `.PBrsync/logs`
 
 ## Setting Up SSH Keys
 
-The typical call requires about 10 remote calls[^remotecalls] it is almost a requirement that you set up SSHkeys. Based on the comments for [BitPocket][BitPocket], it is better to *not* use a key password.
+The typical call requires about 10 remote calls (see below) it is almost a requirement that you set up SSHkeys. Based on the comments for [BitPocket][BitPocket], it is better to *not* use a key password.
 
 On both the local and remote machine, perform any ssh connection to generate the needed directories.
 
@@ -235,6 +236,19 @@ On your local machine:
     $ cat ~/.ssh/id_rsa.pub | ssh user@remote-system "mkdir -p ~/.ssh && cat >>  ~/.ssh/authorized_keys" 
 
 That should be it. If not, search for it. 
+
+### Remote Calls
+
+Below are all of the remote opperations requiring a handshake
+
+* (1) Current file snapshot , 
+* Apply moves
+    * (1) Upload move queue
+    * (1) Apply
+* (2) dry-run rsync both ways (
+* (2) apply moves again 
+* (2) Apply rsync both ways 
+* (1) updated snapshot 
 
 ## Other tips:
 
@@ -253,8 +267,6 @@ Also in the future will be a way to prune the backups and snapshots to only keep
 Finally, future versions may try to use a Python SSH module such as [Paramiko][Paramiko] (with the current method as a fall back) to reduce the number of connections. Or, it will try to use a persistant SSH connection. Either way, it will try to reduce the number of connections to a minimum.
 
 
-[^remotecalls]: Current file snapshot (1), apply moves (2), dry-run rsync both ways (2), apply moves (2), apply rsync both ways (2), ask for updated snapshot (1)
-[^backnewest]:If you don't have both local and remote backups on with the setting to only keep the newest, it will warn you and then wait 3 seconds
 
 
 [Paramiko]:http://www.paramiko.org/ 
