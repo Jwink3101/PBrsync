@@ -241,11 +241,11 @@ That should be it. If not, search for it.
 
 Below are all of the remote opperations requiring a handshake
 
-* (1) Current file snapshot , 
+* (1) Current file snapshot 
 * Apply moves
     * (1) Upload move queue
     * (1) Apply
-* (2) dry-run rsync both ways (
+* (2) dry-run rsync both ways
 * (2) apply moves again 
 * (2) Apply rsync both ways 
 * (1) updated snapshot 
@@ -255,6 +255,8 @@ Below are all of the remote opperations requiring a handshake
 * Use `--silent` for cron to not print anything to screen
 * Use Cron to perform backups
 * If on a mac, use Automator to make a "Sync" button
+* In my *limited* testing, this works well with `PyPy`
+* Create an alias to run PBrsync (maybe with `PyPy`) so you can run it on any folder
 
 ## Future Additions:
 

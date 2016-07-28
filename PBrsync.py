@@ -137,18 +137,20 @@ def sync(path='.'):
     
     ################
     
-    rsyncFlag_FINAL = ['-v','--exclude-from','excludeBGWBDHDW.TMP']
+    tmpFile = randomString(10)
     
-    with open('excludeBGWBDHDW.TMP','w') as F:
+    rsyncFlag_FINAL = ['-v','--exclude-from',tmpFile,'--exclude',tmpFile]
+    
+    with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeA2B+excludeDirs+excludeNames+excludePaths))
     A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync])
 
-    with open('excludeBGWBDHDW.TMP','w') as F:
+    with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeB2A+excludeDirs+excludeNames+excludePaths))
 
     B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA])
 
-    os.remove('excludeBGWBDHDW.TMP')
+    os.remove(tmpFile)
     
     tmpLogSpace = 0
     addLog('')
