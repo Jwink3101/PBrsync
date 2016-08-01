@@ -14,6 +14,10 @@ try:
     import simplejson as json
 except:
     import json
+try:
+    from subprocess import DEVNULL # py3k
+except ImportError:
+    DEVNULL = open(os.devnull, 'wb')
 
 excludeDirs = ['.PBrsync']    # Full (relative) path to exclude directories
 excludePaths = []               # Full (relative) path to exclude file
@@ -99,8 +103,8 @@ def sync(path='.'):
     if isBremote:
         pathBrsync = '{:s}:{:s}'.format(B_host,pathB)
     
-    A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathA,pathBrsync])
-    B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathBrsync,pathA])
+    A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathA,pathBrsync],stderr=DEVNULL)
+    B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathBrsync,pathA],stderr=DEVNULL)
     
    
     addLog(' ')
@@ -143,12 +147,12 @@ def sync(path='.'):
     
     with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeA2B+excludeDirs+excludeNames+excludePaths))
-    A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync])
+    A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],stderr=DEVNULL)
 
     with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeB2A+excludeDirs+excludeNames+excludePaths))
 
-    B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA])
+    B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],stderr=DEVNULL)
 
     os.remove(tmpFile)
     
@@ -192,10 +196,10 @@ def pushpull(path,pushpull,delete=False):
         rsyncFlag_FINAL.append('--delete')    
     
     if pushpull == 'pull':
-        B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA])
+        B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],stderr=DEVNULL)
         A2B = ''
     elif pushpull == 'push':
-        A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync])
+        A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],stderr=DEVNULL)
         B2A = ''
     
     addLog('rsync Transfer')
@@ -440,7 +444,7 @@ def getB_FileInfoList(empty=None):
         return FileInfoList(pathB,empty=empty)
     
     # Build the command
-    cmd = 'ssh -T {:s} "{:s} API_listFiles'.format(B_host,B_pathToPBrsync)
+    cmd = 'ssh -T -q {:s} "{:s} API_listFiles'.format(B_host,B_pathToPBrsync)
     
     for dir in excludeDirs:
         cmd += ' --excludeDir {:s} '.format(dir)
@@ -719,7 +723,7 @@ def B_ProcActQueue(action_queue,Machine=None,backupItems=None):
     # Build the remote commands
     
     remoteFile = '{:s}{:s}'.format(pathB,tmpRemote)
-    cmd = 'ssh -T {:s} "{:s} API_runQueue {:s}"'.format(B_host,B_pathToPBrsync,remoteFile)
+    cmd = 'ssh -T -q {:s} "{:s} API_runQueue {:s}"'.format(B_host,B_pathToPBrsync,remoteFile)
     
     tmpFile = randomString(10)  + '.dat'
     os.system(cmd + ' > ' + tmpFile)
@@ -1221,7 +1225,7 @@ def snapshot(path='.',force=False,excludes=[]):
     
     if len(oldSnaps) == 0:
         # This is the first snap shot. Do a full copy
-        output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest])
+        output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest],stderr=DEVNULL)
         addLog('Initial snapshot. Note this is full copy')
         addLog('but future copies will only be changes')
     else:    
@@ -1229,7 +1233,7 @@ def snapshot(path='.',force=False,excludes=[]):
         linkDir = snapDestDir + sorted(oldSnaps)[-1] # Newest
     
         RsyncFlags += ['--link-dest={:s}'.format(linkDir)]
-        output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest])
+        output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest],stderr=DEVNULL)
         
         addLog(' Snapshot generated in {:s}'.format(snapDest))
         addLog('  Used {:s} to link unchaged files'.format(linkDir))
@@ -1268,7 +1272,7 @@ def remoteSnap(path='.',excludes=[]):
     
     excludeTXT = ''.join([' --exclude {:s} '.format(a) for a in excludes]).replace('  ',' ')
     
-    cmd = 'ssh -T {:s} "{:s} snapshot {:s} --force {:s}"'.format(B_host,B_pathToPBrsync,excludeTXT,pathB)
+    cmd = 'ssh -T -q {:s} "{:s} snapshot {:s} --force {:s}"'.format(B_host,B_pathToPBrsync,excludeTXT,pathB)
 
     addLog(' Calling:')
     addLog('  `{:s}`'.format(cmd))
