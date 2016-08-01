@@ -1231,7 +1231,7 @@ def snapshot(path='.',force=False,excludes=[]):
         RsyncFlags += ['--link-dest={:s}'.format(linkDir)]
         output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest])
         
-        addLog(' Snapshot genered in {:s}'.format(snapDest))
+        addLog(' Snapshot generated in {:s}'.format(snapDest))
         addLog('  Used {:s} to link unchaged files'.format(linkDir))
     
     addLog(' ')
