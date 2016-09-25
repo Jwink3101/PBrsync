@@ -338,7 +338,7 @@ def parseInput(path):
     pathB = remoteConfig['path']
 
     isBremote = False
-    if 'host' in remoteConfig.keys():
+    if 'host' in remoteConfig:
         global B_host,B_pathToPBrsync
         isBremote = True 
         B_pathToPBrsync = remoteConfig['pbrsync']
@@ -617,14 +617,21 @@ def movedFileDict(curList,oldList):
     # Make old into dictionary by inode. Recall that the objects are pointers
     oldList_inode = {file.inode:file for file in oldList}  
 
+
+    # Recall
+    #     if a in D.keys()
+    # is O(N) while
+    #     if a in D
+    # is O(1) and is the same. Makes this O(N) instead of O(N^2) on average
+
     # Find if the paths have changed. We use the curList and not a dictionary 
     # version since we care about the order
     movedDict = {}
     for file in curList[::-1]:
-        if file.inode not in oldList_inode.keys(): # New file or not found
+        if file.inode not in oldList_inode: # New file or not found
             continue
             
-        if file.path == oldList_inode[file.inode].path:
+        if file.path == oldList_inode[file.inode].path: # Not moved
             continue
     
         if ctime_check and abs(oldList_inode[file.inode].ctime - file.ctime) > 1:
@@ -653,11 +660,11 @@ def MovedFileQueue(curListA,oldListA,curListB,oldListB):
     moveQueueB = []
     moveQueueA = []
 
-    #
+    # This scales as O(n*N) where n is number of moved files and N is number of files
 
     for path_oldA,path_newA in moved_Local.iteritems():
         # Is this path moved in remote
-        if path_oldA not in moved_Remote.keys():
+        if path_oldA not in moved_Remote:
             # No conflict. Either means it was not moved or it was deleted on A  
             fileBcurr = GetMatchingFile(curListB,path_oldA,'path') # Has not moved so use old path
         
@@ -678,7 +685,7 @@ def MovedFileQueue(curListA,oldListA,curListB,oldListB):
 
     for path_oldB,path_newB in moved_Remote.iteritems():
         # Has the local path changed?
-        if path_oldB not in moved_Local.keys():
+        if path_oldB not in moved_Local:
             # No conflict. Either was deleted or not moved
             fileAcurr = GetMatchingFile(curListA,path_oldB,'path')
         
@@ -810,6 +817,9 @@ def GetMatchingFile(file_list,file_or_attribute,attribute='path'):
     Returns the file if found. Otherwise, returns None
     
     """
+    
+    # Not to self: This is O(N). I should try to improve it...
+    
     if attribute.lower() == 'any':
         pmatch = GetMatchingFile(file_list,file_or_attribute,attribute='path' )
         imatch = GetMatchingFile(file_list,file_or_attribute,attribute='inode')
@@ -906,12 +916,12 @@ def CompareRsyncResults(A2B,B2A,curListA,oldListA,curListB,oldListB):
             sys.exit(2)
         
         if path.endswith('/'):        
-            if path in rsyncDict_Folders.keys():
+            if path in rsyncDict_Folders:
                 rsyncDict_Folders[path]['B2A'] = action
             else:
                 rsyncDict_Folders[path] = {'B2A':action}
         else:
-            if path in rsyncDict_Files.keys():
+            if path in rsyncDict_Files:
                 rsyncDict_Files[path]['B2A'] = action
             else:
                 rsyncDict_Files[path] = {'B2A':action}
@@ -932,12 +942,12 @@ def CompareRsyncResults(A2B,B2A,curListA,oldListA,curListB,oldListB):
         
         
         if path.endswith('/'):        
-            if path in rsyncDict_Folders.keys():
+            if path in rsyncDict_Folders:
                 rsyncDict_Folders[path]['A2B'] = action
             else:
                 rsyncDict_Folders[path] = {'A2B':action}
         else:
-            if path in rsyncDict_Files.keys():
+            if path in rsyncDict_Files:
                 rsyncDict_Files[path]['A2B'] = action
             else:
                 rsyncDict_Files[path] = {'A2B':action}
@@ -960,9 +970,9 @@ def CompareRsyncResults(A2B,B2A,curListA,oldListA,curListB,oldListB):
         
         actions = rsyncDict_Folders[folderPath]
         a2b = b2a = ''
-        if 'A2B' in actions.keys():
+        if 'A2B' in actions:
             a2b = actions['A2B']
-        if 'B2A' in actions.keys():
+        if 'B2A' in actions:
             b2a = actions['B2A']
 
         # Non-file modifications
@@ -1011,9 +1021,9 @@ def CompareRsyncResults(A2B,B2A,curListA,oldListA,curListB,oldListB):
         
         actions = rsyncDict_Files[filePath]
         a2b = b2a = None
-        if 'A2B' in actions.keys():
+        if 'A2B' in actions:
             a2b = actions['A2B']
-        if 'B2A' in actions.keys():
+        if 'B2A' in actions:
             b2a = actions['B2A']
 
         # In THEORY there should never be a None item since any difference will
@@ -1301,6 +1311,10 @@ def byteify(input):
     From : http://stackoverflow.com/a/13105359
     with minor changes
     """
+        
+    # I do not think this is needed but will keep it around for now just in case
+    return input
+    
     if isinstance(input, dict):
         retDict = {}
         for key,value in input.iteritems():
@@ -1938,7 +1952,7 @@ if __name__ =='__main__':
         
         pathA = remoteDict['startPath']
         
-        if 'backupList' in remoteDict.keys():
+        if 'backupList' in remoteDict:
             perform_local_backup(remoteDict['backupList'],path=pathA)
         
         ProcessActionQueue(remoteDict['startPath'],remoteDict['action_queue'],Machine=remoteDict['Machine'])

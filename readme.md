@@ -199,6 +199,11 @@ My requirements were:
     
 However, the design and methods are heavily inspired by [**BitPocket**][BitPocket] and [**bsync**][bsync] and I owe them a debt of gratitude. (and if your restrictions allow for them, I would check them out too!)
 
+## Scalability
+
+I have not performed a rigorous complexity analysis but I have since tried to improve the scaling to be roughly `O(N)` for `N` files plus `O(N*n)` for `n` moved files. This isn't perfect but the improvement made a big difference. And the moved file check is the the computational bottleneck.
+
+I currently use this for, amongst other things, keeping my file-based photo-library up to date. For about 31,000 photos and 65G, a sync operation with on an already synchronized folder (that is, it needs to check for moves but doesn't actually have any) is about 10 seconds. (Before the improvement, it was 30). Note that these times are when running in PyPy.
 
 ## Logs
 
