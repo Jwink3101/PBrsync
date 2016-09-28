@@ -225,6 +225,7 @@ All logs are stored in `.PBrsync/logs`
     * Can get transferred depending on exact rsync version
     * Get backed up if they are to be deleted and `localbackup` or `remotebackup` is `True`
     * If you move a folder, the old folder will *show* as deleted but everything else happens as you'd expect.
+    * May get deleted if created as empty and then done with a sync
 * **Possible Limitation**: Unlike vanilla rsync, this has to perform a lot more "thinking" and, more importantly, makes many (10!!!) remote hand shakes. This is most of the overhead. (Future versions may try to reduce this.)
 
 ## Setting Up SSH Keys
@@ -246,14 +247,14 @@ That should be it. If not, search for it.
 
 Below are all of the remote opperations requiring a handshake
 
-* (1) Current file snapshot 
-* Apply moves
+* (1) remote file snapshot 
+* apply moves based on file renamed/moves
     * (1) Upload move queue
-    * (1) Apply
-* (2) dry-run rsync both ways
-* (2) apply moves again 
-* (2) Apply rsync both ways 
-* (1) updated snapshot 
+    * (1) apply
+* (2) dry-run rsync push and pull
+* (2) apply moves again to resolve conflicts
+* (2) run rsync again, push and pull
+* (1) updated remote snapshot 
 
 ## Other tips:
 

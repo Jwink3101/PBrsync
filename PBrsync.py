@@ -24,7 +24,7 @@ excludePaths = []               # Full (relative) path to exclude file
 excludeNames = ['.DS_Store']    # Exclude any file with this name
 RsyncFlags = ['-hh']
 silent = False
-ctime_check = False
+check_ctime = False
 tmpLogSpace = 0
 allow_snap = True
 local_backup = True
@@ -43,6 +43,7 @@ def sync(path='.'):
     global lastrun_time
     global Aname,pathA,Bname,pathB
     global rsyncFlags_ALL,pathBrsync
+    global nonPyTime
     
     start()
     
@@ -103,8 +104,11 @@ def sync(path='.'):
     if isBremote:
         pathBrsync = '{:s}:{:s}'.format(B_host,pathB)
     
+    T0tmp = time.time()
     A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathA,pathBrsync],stderr=DEVNULL)
     B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathBrsync,pathA],stderr=DEVNULL)
+    nonPyTime += time.time() - T0tmp 
+    
     
    
     addLog(' ')
@@ -147,12 +151,17 @@ def sync(path='.'):
     
     with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeA2B+excludeDirs+excludeNames+excludePaths))
+    
+    T0tmp = time.time()
     A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],stderr=DEVNULL)
+    nonPyTime += time.time() - T0tmp
 
     with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeB2A+excludeDirs+excludeNames+excludePaths))
 
+    T0tmp = time.time()
     B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],stderr=DEVNULL)
+    nonPyTime += time.time() - T0tmp
 
     os.remove(tmpFile)
     
@@ -215,9 +224,10 @@ def start():
     global lastrun_time
     global Aname,pathA,Bname,pathB
     
-    global startTime
+    global startTime,nonPyTime
     
     startTime = time.time()
+    nonPyTime = 0.0
     
     tmpLogSpace = 0
     
@@ -277,7 +287,9 @@ def cleanup():
         F.write(str(time.time()))
     
     
-    addLog('Finished: {:s} seconds'.format(str(time.time() - startTime)))
+    elapsedTime = time.time() - startTime
+    pyTime = elapsedTime - nonPyTime
+    addLog('Finished: {:f} seconds. ({:f} seconds inside Python)'.format(elapsedTime,pyTime))
     
     
     addLog(' ')
@@ -438,7 +450,7 @@ def getB_FileInfoList(empty=None):
     global excludeDirs 
     global excludePaths
     global excludeNames
-
+    global nonPyTime
     
     if not isBremote:
         return FileInfoList(pathB,empty=empty)
@@ -460,8 +472,12 @@ def getB_FileInfoList(empty=None):
     # to a file and read it. Use `os.system`
     
     tmpFile = randomString(10)
-        
+    
+    Ttmp = time.time()    
     stat = os.system(cmd + ' >& ' + tmpFile) # Add a pipe for error output
+    nonPyTime += time.time() - Ttmp
+    
+    
     with open(tmpFile,'r') as F:
         fileList = F.read()
     os.remove(tmpFile)
@@ -634,7 +650,7 @@ def movedFileDict(curList,oldList):
         if file.path == oldList_inode[file.inode].path: # Not moved
             continue
     
-        if ctime_check and abs(oldList_inode[file.inode].ctime - file.ctime) > 1:
+        if check_ctime and abs(oldList_inode[file.inode].ctime - file.ctime) > 1:
             addLog('Matched inode but unmatched ctime: {:s},{:s}. Skip'.format(oldList_inode[file.inode].path,file.path))
             continue
         
@@ -703,6 +719,7 @@ def MovedFileQueue(curListA,oldListA,curListB,oldListB):
 
 def B_ProcActQueue(action_queue,Machine=None,backupItems=None):
     global isBremote, B_host, B_pathToPBrsync,pathB
+    global nonPyTime
 
     if not isBremote:
         if backupItems is not None:
@@ -723,7 +740,11 @@ def B_ProcActQueue(action_queue,Machine=None,backupItems=None):
     
     # SCP the file
     pathB = StandardizeFolderPath(pathB)
+    
+    T0tmp = time.time()
     cmd = 'scp {0:s} {1:s}:{2:s}{0:s} > /dev/null 2>&1'.format(tmpRemote,B_host,pathB)
+    nonPyTime += time.time() - T0tmp
+    
     os.system(cmd)
     os.remove(tmpRemote)
     
@@ -733,7 +754,12 @@ def B_ProcActQueue(action_queue,Machine=None,backupItems=None):
     cmd = 'ssh -T -q {:s} "{:s} API_runQueue {:s}"'.format(B_host,B_pathToPBrsync,remoteFile)
     
     tmpFile = randomString(10)  + '.dat'
+    
+    T0tmp = time.time()
     os.system(cmd + ' > ' + tmpFile)
+    nonPyTime += time.time() - T0tmp
+    
+    
     with open(tmpFile,'r') as F:
         remote_log = F.read()
         # Look for `'>>><<<>>><<<>>><<<>>><<<'` which is at the start of the file
@@ -1392,7 +1418,8 @@ def reset_configfile(path='.',force=False):
 #   
 # Additionally for a real remote machine, specify
 #   host            :   user@host.name
-#   PBrsync         :   Path the the PBrsync.py file
+#   PBrsync         :   Path the the PBrsync.py file on remote 
+#                       machine
 #   
 #   If those are not specified, it assumes a local "remote" 
 #   machine 
@@ -1409,7 +1436,7 @@ def reset_configfile(path='.',force=False):
 #   snapshots       :   Allow snapshots in this directory
 #   localbackup     :   Backup all files that are to be 
 #                       overwritten or deleted. Does not back up 
-#                       files to be moved. Only applies to `sync`
+#                       files to be moved. Only applies to sync
 #   remotebackup    :   Backup all remote files before 
 #                       overwritten or deleted. Only applies to 
 #                       sync
@@ -1456,11 +1483,8 @@ conflictMode = both
 # conflictMode = A
 # conflictMode = B
 
-
-
 # These are also the defaults if you remove them:
 check_ctime = False
-
 
 [exclusions]
 # Remember to specify only one item per parameter
