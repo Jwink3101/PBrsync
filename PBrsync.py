@@ -650,9 +650,11 @@ def movedFileDict(curList,oldList):
         if file.path == oldList_inode[file.inode].path: # Not moved
             continue
     
-        if check_ctime and abs(oldList_inode[file.inode].ctime - file.ctime) > 1:
+        if False and check_ctime and abs(oldList_inode[file.inode].ctime - file.ctime) > 1:
             addLog('Matched inode but unmatched ctime: {:s},{:s}. Skip'.format(oldList_inode[file.inode].path,file.path))
             continue
+        
+        ## Currently set the above to False since I learned this is *bad* way to check create time
         
         if file.path.endswith('.JWempty'):
             # This is a special case for the test run where things are created too soon
