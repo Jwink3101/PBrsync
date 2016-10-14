@@ -246,6 +246,15 @@ def start():
     
     # Logging
     addLog('#'*60)
+    addLog('#')
+    addLog('''#   _____   ____                                 ''')
+    addLog('''#  |  __ \ |  _ \                                ''')
+    addLog('''#  | |__) || |_) | _ __  ___  _   _  _ __    ___ ''')
+    addLog('''#  |  ___/ |  _ < | '__|/ __|| | | || '_ \  / __|''')
+    addLog('''#  | |     | |_) || |   \__ \| |_| || | | || (__ ''')
+    addLog('''#  |_|     |____/ |_|   |___/ \__, ||_| |_| \___|''')
+    addLog('''#                               __/ |            ''')
+    addLog('''#                              |___/             ''')
     addLog('# PBrsync -- Python-wrapper for Bi-directional rsync')
     addLog('#')
     addLog('#      >>>>> Use at your own risk!!! <<<<<')
