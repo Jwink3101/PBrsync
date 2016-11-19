@@ -22,7 +22,6 @@ This is incomplete
 
 * Automatic snapshot support
     * For now, include in a script, etc
-* Automatic (and configurable) pruning of backups
 * Cron documentation
 
 ## Distant Future

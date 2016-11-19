@@ -5,7 +5,7 @@ import shutil
 import subprocess
 import time
 import sys
-from datetime import datetime
+from datetime import datetime,timedelta
 import getopt
 import string,random
 import ConfigParser
@@ -1217,7 +1217,7 @@ def perform_local_backup(items,path=None):
         addLog('* None *')
     addLog(' ')    
     
-def snapshot(path='.',force=False,excludes=[]):
+def snapshot(path='.',force=False,excludes=[],prune=False):
     """
     Perform a snapshot
     """
@@ -1268,6 +1268,58 @@ def snapshot(path='.',force=False,excludes=[]):
         os.makedirs(snapDestDir) # First one, make directory:
         
     oldSnaps = os.listdir(snapDestDir)
+
+    if prune:
+        addLog('Prune Mode:')
+        
+        # If older than 30 days : Keep 1 per week
+        # If in the last 30, keep 1 per day
+        # If in the last 2 days, keep all
+        dateObj = [datetime.strptime(d,'%Y-%m-%d_%H%M%S') for d in oldSnaps]
+        now = datetime.now()
+
+        ## Older than a month
+        minus30 = now - timedelta(days=30)
+        oldest = [d for d in dateObj if d < minus30]
+
+        # Make a list of those who to cut
+        allCut = []
+        wknum_done = set([])
+
+        for d in oldest:
+            yearwk = d.strftime("%Y%U")
+            if yearwk in wknum_done:
+                allCut.append(d)
+            wknum_done.add(yearwk)
+
+        ## Less than 30, more than 2
+        minus01 = now - timedelta(days=1)
+        monthOld = [d for d in dateObj if (d > minus30 and d < minus01)]
+
+
+        # Make a list of those who to cut
+        daydiff_done = set([])
+
+        for d in monthOld:
+            daydiff = (now-d).days
+            if daydiff in daydiff_done:
+                allCut.append(d)
+            daydiff_done.add(daydiff)
+
+        allCut = [d.strftime('%Y-%m-%d_%H%M%S') for d in allCut]
+
+        if len(allCut) > 0: 
+            addLog(' Pruned:')
+        for cut in allCut:
+            fullDir = os.path.join(snapDestDir,cut)
+            shutil.rmtree(fullDir)
+            addLog('   {:s}'.format(cut))
+
+        addLog(' ')
+        addLog('Saved Log in {:s}'.format(logFile.name),flush=True)
+        logFile.close()
+        return
+        
     
     
     if len(oldSnaps) == 0:
@@ -1295,7 +1347,7 @@ def snapshot(path='.',force=False,excludes=[]):
     addLog('Saved Log in {:s}'.format(logFile.name),flush=True)
     logFile.close()
     
-def remoteSnap(path='.',excludes=[]):
+def remoteSnap(path='.',excludes=[],prune=False):
     path = StandardizeFolderPath(os.path.abspath(path))
     
     parseInput(path)
@@ -1318,6 +1370,9 @@ def remoteSnap(path='.',excludes=[]):
     excludes += excludeDirs + excludePaths + excludeNames
     
     excludeTXT = ''.join([' --exclude {:s} '.format(a) for a in excludes]).replace('  ',' ')
+    
+    if prune:
+        excludeTXT = ' --prune ' + excludeTXT
     
     cmd = 'ssh -T -q {:s} "{:s} snapshot {:s} --force {:s}"'.format(B_host,B_pathToPBrsync,excludeTXT,pathB)
 
@@ -1661,6 +1716,10 @@ def usage(cmd=None):
                         Will **NOT** overrule a config that dissallows 
                         snapshots. See note below
         -h,--help   :   Display this message
+        --prune     :   Prune older snapshots:
+                            * 1 per week older than 30 days
+                            * 1 per day for between 1 and 30 days old
+                            * Keep all within the last day
         -R,--remote :   Attempt to perform a snapshot of the remote server.
                         If the remote server is configured for PBrsync, it will
                         follow the config  `allow_snapshot` setting. Otherwise,
@@ -1852,7 +1911,7 @@ if __name__ =='__main__':
         init(path,force=force)
     elif mode == 'snapshot':
         try:
-            opts, args = getopt.getopt(argsIN, "hR", ["help","remote","silent","force","exclude="])
+            opts, args = getopt.getopt(argsIN, "hR", ["help","remote","silent","prune","force","exclude="])
         except getopt.GetoptError as err:
             print str(err) #print error
             print "\n Printing Help:\n"
@@ -1867,6 +1926,7 @@ if __name__ =='__main__':
         performRemote = False
         force = False       
         excludes = []
+        prune = False
         
         for o,a in opts:
             if o in ("-h", "--help"):
@@ -1880,13 +1940,15 @@ if __name__ =='__main__':
                 force=True
             if o in ['--exclude']:
                 excludes.append(a)
+            if o in ['--prune']:
+                prune = True
                 
         
         if performRemote:
-            remoteSnap(path,excludes=excludes)
+            remoteSnap(path,excludes=excludes,prune=prune)
             sys.exit()        
         
-        snapshot(path,force=force,excludes=excludes)       
+        snapshot(path,force=force,excludes=excludes,prune=prune)       
     elif mode == 'resetfiles':
         try:
             opts, args = getopt.getopt(argsIN, "hf", ["help","force"])

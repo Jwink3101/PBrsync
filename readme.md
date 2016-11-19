@@ -170,11 +170,26 @@ Alternatively, built in (if allowed in the config file) is the ability to perfor
 * Unlike sync, snapshots do not track moves.
 * `push` and `pull` do not back up
 
-**Note:** You must manually delete the backups
-
 If you wish to see the file sizes for the snapshots, `cd` to that folder then do
 `du -sch *` which will list the *actual* storage usage
 
+### Pruning older snapshots
+
+Older *snapshots* may be pruned with the
+
+    $ ./PBrsync snapshot --prune path/to/folder
+
+mode. It will keep:
+    
+* 1 per week older than 30 days
+* 1 per day for between 1 and 30 days old
+* Keep all within the last day
+
+Notes:
+
+* `--prune` will *not* also take a snapshot! Must make separate calls
+* use `--prune --remote` to prune remote snapshots too!
+* Only works (for now) on snapshots
 
 ## Background: Requirements and Other Options
 
