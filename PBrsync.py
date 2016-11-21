@@ -1217,7 +1217,7 @@ def perform_local_backup(items,path=None):
         addLog('* None *')
     addLog(' ')    
     
-def snapshot(path='.',force=False,excludes=[],prune=False):
+def snapshot(path='.',force=False,excludes=[],prune=False,snap=True):
     """
     Perform a snapshot
     """
@@ -1270,11 +1270,11 @@ def snapshot(path='.',force=False,excludes=[],prune=False):
     oldSnaps = os.listdir(snapDestDir)
 
     if prune:
-        addLog('Prune Mode:')
-        
-        # If older than 30 days : Keep 1 per week
-        # If in the last 30, keep 1 per day
-        # If in the last 2 days, keep all
+        addLog('Prune Older Snapshots:')
+        addLog('    * Older than 30 days: 1 per week')
+        addLog('    * 1-30 days old, one per day')
+        addLog('    * last 24 hours, keep all')
+    
         dateObj = [datetime.strptime(d,'%Y-%m-%d_%H%M%S') for d in oldSnaps]
         now = datetime.now()
 
@@ -1316,11 +1316,10 @@ def snapshot(path='.',force=False,excludes=[],prune=False):
             addLog('   {:s}'.format(cut))
 
         addLog(' ')
-        addLog('Saved Log in {:s}'.format(logFile.name),flush=True)
-        logFile.close()
-        return
-        
-    
+        if not snap: # Terminate
+            addLog('Saved Log in {:s}'.format(logFile.name),flush=True)
+            logFile.close()
+            return
     
     if len(oldSnaps) == 0:
         # This is the first snap shot. Do a full copy
@@ -1335,7 +1334,7 @@ def snapshot(path='.',force=False,excludes=[],prune=False):
         output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest],stderr=DEVNULL)
         
         addLog(' Snapshot generated in {:s}'.format(snapDest))
-        addLog('  Used {:s} to link unchaged files'.format(linkDir))
+        addLog('  Used {:s} to hard-link unchaged files'.format(linkDir))
     
     addLog(' ')
     addLog('-'*60)
@@ -1347,7 +1346,7 @@ def snapshot(path='.',force=False,excludes=[],prune=False):
     addLog('Saved Log in {:s}'.format(logFile.name),flush=True)
     logFile.close()
     
-def remoteSnap(path='.',excludes=[],prune=False):
+def remoteSnap(path='.',excludes=[],prune=False,snap=True):
     path = StandardizeFolderPath(os.path.abspath(path))
     
     parseInput(path)
@@ -1372,7 +1371,10 @@ def remoteSnap(path='.',excludes=[],prune=False):
     excludeTXT = ''.join([' --exclude {:s} '.format(a) for a in excludes]).replace('  ',' ')
     
     if prune:
-        excludeTXT = ' --prune ' + excludeTXT
+        if snap:
+            excludeTXT = ' --prune ' + excludeTXT
+        else:
+            excludeTXT = ' --prune-only ' + excludeTXT
     
     cmd = 'ssh -T -q {:s} "{:s} snapshot {:s} --force {:s}"'.format(B_host,B_pathToPBrsync,excludeTXT,pathB)
 
@@ -1720,6 +1722,7 @@ def usage(cmd=None):
                             * 1 per week older than 30 days
                             * 1 per day for between 1 and 30 days old
                             * Keep all within the last day
+        --prune-only:   *Only* prune older snapshots. Do not run one
         -R,--remote :   Attempt to perform a snapshot of the remote server.
                         If the remote server is configured for PBrsync, it will
                         follow the config  `allow_snapshot` setting. Otherwise,
@@ -1911,7 +1914,7 @@ if __name__ =='__main__':
         init(path,force=force)
     elif mode == 'snapshot':
         try:
-            opts, args = getopt.getopt(argsIN, "hR", ["help","remote","silent","prune","force","exclude="])
+            opts, args = getopt.getopt(argsIN, "hR", ["help","remote","silent","prune","prune-only","force","exclude="])
         except getopt.GetoptError as err:
             print str(err) #print error
             print "\n Printing Help:\n"
@@ -1927,6 +1930,7 @@ if __name__ =='__main__':
         force = False       
         excludes = []
         prune = False
+        snap = True
         
         for o,a in opts:
             if o in ("-h", "--help"):
@@ -1942,13 +1946,16 @@ if __name__ =='__main__':
                 excludes.append(a)
             if o in ['--prune']:
                 prune = True
+            if o in ['--prune-only']:
+                prune = True
+                snap = False
                 
         
         if performRemote:
-            remoteSnap(path,excludes=excludes,prune=prune)
+            remoteSnap(path,excludes=excludes,prune=prune,snap=snap)
             sys.exit()        
         
-        snapshot(path,force=force,excludes=excludes,prune=prune)       
+        snapshot(path,force=force,excludes=excludes,prune=prune,snap=snap)       
     elif mode == 'resetfiles':
         try:
             opts, args = getopt.getopt(argsIN, "hf", ["help","force"])

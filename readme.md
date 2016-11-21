@@ -187,9 +187,9 @@ mode. It will keep:
 
 Notes:
 
-* `--prune` will *not* also take a snapshot! Must make separate calls
+* `--prune` *will* also take a snapshot. Use `--prune-only` to not take a snapshot
 * use `--prune --remote` to prune remote snapshots too!
-* Only works (for now) on snapshots
+* Only works (for now) on snapshots, not pre-sync backups
 
 ## Background: Requirements and Other Options
 
