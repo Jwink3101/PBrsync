@@ -7,7 +7,7 @@ These are roughly how the code works. The code itself if fairly well documented 
 * The local and remote file tree is parsed generating a list of all files including their modification date, creation time, and inode number
     * See  Remote Operations for how it's done on the remote
     * If an empty folder is encountered, a temp file is created
-* File moves are detected (based on inode numbers and optionally, creation time)
+* File moves are detected (based on inode numbers ~~and optionally, creation time~~)
     * For both the local and remote, a list of all moved files is generated
     * Local moves are checked against the remote
         * If not moved on the remote, check if it has been deleted. If not, queue the move on the remote

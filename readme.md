@@ -1,13 +1,19 @@
 # `PBrsync` --  Python Wrapper for Bidirectional `rsync` 
 
-**>>>>> Use at your own risk!!! <<<<<**
+`PBrsync` is a wrapper around multiple `rsync` calls and a small inode-based file tracker. It performs bi-directional synchronization, tracks and propogates file moves (and renames) and has two integrated backup strategies.
 
-This tool came out of a need for bi-directional synchronization that works on a [fairly] stock Mac OS or Linux set up.
+It isn't perfect, but works *most* of the time. This tool came out of a need for bi-directional synchronization that works on a [fairly] stock Mac OS or Linux set up.
 
 There are other tools like it and for many, they are probably better. This fit a special niche for me. See below for more details
 
 
 ## Usage:
+
+Once you have everything set up, navigate to your folder and simply run:
+
+    $ python PBrsync.py sync folder
+
+(or set up some aliases as noted below).
 
 ### `Help` Info
 
@@ -145,7 +151,7 @@ The automatic `config` file has instructions. They are also reproduced below:
 
 ## How it Works:
 
-`PBrsync` is a python-wrapper around multiple rsync calls. By storing a snapshot of the past file-system and tracking inode numbers (and optionally, creation time) moves are detected and applied. For more detials, read the design notes.
+`PBrsync` is a python-wrapper around multiple rsync calls. By storing a snapshot of the past file-system and tracking inode numbers ~~(and optionally, creation time)~~ (file creation times do not work universally) moves are detected and applied. For more detials, read the design notes.
 
 There is no interactivity. Based on the (self commented) config settings, you can either resolve conflicts by keeping the newest (and hopefully having backups on), keeping both, or always keeping either local or remote. If you don't have both local and remote backups on with the setting to only keep the newest, it will warn you and then wait 3 seconds
 
@@ -277,7 +283,16 @@ Below are all of the remote opperations requiring a handshake
 * Use Cron to perform backups
 * If on a mac, use Automator to make a "Sync" button
 * In my *limited* testing, this works well with `PyPy`
-* Create an alias to run PBrsync (maybe with `PyPy`) so you can run it on any folder
+* Create an alias to run PBrsync (maybe with `PyPy`) so you can run it on any folder. For example, I include the following in my `.bash_profile`:
+
+`.bash_profile:`
+
+    PBrsync () {
+        if [ -z $1 ]; then
+            set ".";
+        fi;
+        pypy /path/to/PBrsync/PBrsync.py "$@"
+    }
 
 ## Future Additions:
 

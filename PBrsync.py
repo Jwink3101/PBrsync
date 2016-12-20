@@ -1836,7 +1836,7 @@ if __name__ =='__main__':
         
         path = StandardizeFolderPath(path)
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('sync')
                 sys.exit()
             if o in ['--silent']:
@@ -1859,7 +1859,7 @@ if __name__ =='__main__':
             path = args[0]
         path = StandardizeFolderPath(path)
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('pull')
                 sys.exit()
             if o in ['--silent']:
@@ -1883,7 +1883,7 @@ if __name__ =='__main__':
             path = args[0]
         path = StandardizeFolderPath(path)
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('resetconfig')
                 sys.exit()
             if o in ['--force','-f']:
@@ -1905,7 +1905,7 @@ if __name__ =='__main__':
             path = args[0]
         path = StandardizeFolderPath(path)
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('init')
                 sys.exit()
             if o in ['--force','-f']:
@@ -1933,7 +1933,7 @@ if __name__ =='__main__':
         snap = True
         
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('snapshot')
                 sys.exit()
             if o in ['--remote','-R']:
@@ -1972,7 +1972,7 @@ if __name__ =='__main__':
         path = StandardizeFolderPath(path)
         
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('resetfiles')
                 sys.exit()
             if o in ['--force','-f']:
@@ -1993,7 +1993,7 @@ if __name__ =='__main__':
         empty = None 
         # Parse
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('API_listFiles')
                 sys.exit()
             if o in ['--excludeDir']:
@@ -2039,7 +2039,7 @@ if __name__ =='__main__':
             usage('API_listFiles')
             sys.exit(2)
         for o,a in opts:
-            o in ["-h", "--help"]:
+            if o in ["-h", "--help"]:
                 usage('API_runQueue')
                 sys.exit() 
         
