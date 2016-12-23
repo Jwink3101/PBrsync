@@ -2,7 +2,7 @@
 
 import os
 import shutil
-import subprocess
+# import subprocess # Subprocesses doesn't like a lot of these commands. We just use os.system(cmd >out 2>err) type things. 
 import time
 import sys
 from datetime import datetime,timedelta
@@ -14,15 +14,12 @@ try:
     import simplejson as json
 except:
     import json
-try:
-    from subprocess import DEVNULL # py3k
-except ImportError:
-    DEVNULL = open(os.devnull, 'wb')
 
 excludeDirs = ['.PBrsync']    # Full (relative) path to exclude directories
 excludePaths = []               # Full (relative) path to exclude file
 excludeNames = ['.DS_Store']    # Exclude any file with this name
 RsyncFlags = ['-hh']
+SSH_port = 22
 silent = False
 check_ctime = False
 tmpLogSpace = 0
@@ -30,6 +27,7 @@ allow_snap = True
 local_backup = True
 remote_backup = True
 conflictMode  = 'both'
+
 
 input_parsed = False
 
@@ -46,7 +44,7 @@ def sync(path='.'):
     global nonPyTime
     
     start()
-    
+
     try:
         lastrun_time = float(file(pathA+'.PBrsync/lastrun').read())
     except:
@@ -104,13 +102,12 @@ def sync(path='.'):
     if isBremote:
         pathBrsync = '{:s}:{:s}'.format(B_host,pathB)
     
-    T0tmp = time.time()
-    A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathA,pathBrsync],stderr=DEVNULL)
-    B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathBrsync,pathA],stderr=DEVNULL)
+    T0tmp = time.time()    
+    
+    A2B = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathA,pathBrsync],return_err=False)
+    B2A = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlags_init + [pathBrsync,pathA],return_err=False)
     nonPyTime += time.time() - T0tmp 
     
-    
-   
     addLog(' ')
     addLog('Comparing, resolving conflicts, setting ignore files'); tmpLogSpace = 4
     
@@ -153,14 +150,14 @@ def sync(path='.'):
         F.write('\n'.join(excludeA2B+excludeDirs+excludeNames+excludePaths))
     
     T0tmp = time.time()
-    A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],stderr=DEVNULL)
+    A2B = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],return_err=False)
     nonPyTime += time.time() - T0tmp
 
     with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeB2A+excludeDirs+excludeNames+excludePaths))
 
     T0tmp = time.time()
-    B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],stderr=DEVNULL)
+    B2A = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],return_err=False)
     nonPyTime += time.time() - T0tmp
 
     os.remove(tmpFile)
@@ -205,10 +202,10 @@ def pushpull(path,pushpull,delete=False):
         rsyncFlag_FINAL.append('--delete')    
     
     if pushpull == 'pull':
-        B2A = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],stderr=DEVNULL)
+        B2A = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],return_err=False)
         A2B = ''
     elif pushpull == 'push':
-        A2B = subprocess.check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],stderr=DEVNULL)
+        A2B = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],return_err=False)
         B2A = ''
     
     addLog('rsync Transfer')
@@ -353,7 +350,7 @@ def parseInput(path):
         
 
     # remote
-    global Bname,pathB,isBremote
+    global Bname,pathB,isBremote,RsyncFlags,SSH_port
     remoteConfig = {name:val for name,val in parser.items('remote')}
     Bname = remoteConfig['name'].replace(' ','_')
     pathB = remoteConfig['path']
@@ -364,6 +361,12 @@ def parseInput(path):
         isBremote = True 
         B_pathToPBrsync = remoteConfig['pbrsync']
         B_host = remoteConfig['host']
+    
+    if 'ssh_port' in remoteConfig:
+        SSH_port = int(remoteConfig['ssh_port'])
+    
+    # Add the flag for ssh no matter what
+    RsyncFlags += ['-e "ssh -p {:d}"'.format(SSH_port)] 
     
     global excludeDirs, excludePaths, excludeNames
     
@@ -377,7 +380,7 @@ def parseInput(path):
         else:
             raise ValueError('Unrecognized `exclusions` type')
     
-    global RsyncFlags,check_ctime,allow_snap,local_backup,remote_backup,conflictMode
+    global check_ctime,allow_snap,local_backup,remote_backup,conflictMode
     
     for param,val in  parser.items('other'):
         if param == 'rsyncflags':
@@ -391,7 +394,7 @@ def parseInput(path):
                 sys.exit(2)
         else:
            print('Uncreognized `other` type: {:s}'.format(param))
-           sys.exit()
+           sys.exit(2)
     for param,val in parser.items('backups'):
         if param in ['allow_snap','snapshots']:
             allow_snap = val.lower() == 'true'
@@ -463,9 +466,9 @@ def getB_FileInfoList(empty=None):
     
     if not isBremote:
         return FileInfoList(pathB,empty=empty)
-    
+
     # Build the command
-    cmd = 'ssh -T -q {:s} "{:s} API_listFiles'.format(B_host,B_pathToPBrsync)
+    cmd = 'ssh -T -p {:d} -q {:s} "{:s} API_listFiles'.format(SSH_port,B_host,B_pathToPBrsync)
     
     for dir in excludeDirs:
         cmd += ' --excludeDir {:s} '.format(dir)
@@ -496,7 +499,7 @@ def getB_FileInfoList(empty=None):
         addLog('Check your network connection')
         addLog('Attempted Command:')
         addLog('  $ ' + cmd)
-        sys.exit()
+        sys.exit(2)
     
     # Look for `'>>><<<>>><<<>>><<<>>><<<'` which is at the start of the file
     startIX = fileList.find('>>><<<>>><<<>>><<<>>><<<')
@@ -753,7 +756,7 @@ def B_ProcActQueue(action_queue,Machine=None,backupItems=None):
     pathB = StandardizeFolderPath(pathB)
     
     T0tmp = time.time()
-    cmd = 'scp {0:s} {1:s}:{2:s}{0:s} > /dev/null 2>&1'.format(tmpRemote,B_host,pathB)
+    cmd = 'scp -P {3:d} {0:s} {1:s}:{2:s}{0:s} > /dev/null 2>&1'.format(tmpRemote,B_host,pathB,SSH_port)
     nonPyTime += time.time() - T0tmp
     
     os.system(cmd)
@@ -762,7 +765,7 @@ def B_ProcActQueue(action_queue,Machine=None,backupItems=None):
     # Build the remote commands
     
     remoteFile = '{:s}{:s}'.format(pathB,tmpRemote)
-    cmd = 'ssh -T -q {:s} "{:s} API_runQueue {:s}"'.format(B_host,B_pathToPBrsync,remoteFile)
+    cmd = 'ssh -T -q -p {:d} {:s} "{:s} API_runQueue {:s}"'.format(SSH_port,B_host,B_pathToPBrsync,remoteFile)
     
     tmpFile = randomString(10)  + '.dat'
     
@@ -1323,7 +1326,7 @@ def snapshot(path='.',force=False,excludes=[],prune=False,snap=True):
     
     if len(oldSnaps) == 0:
         # This is the first snap shot. Do a full copy
-        output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest],stderr=DEVNULL)
+        output = _check_output(['rsync']+RsyncFlags + [path,snapDest],return_err=False)
         addLog('Initial snapshot. Note this is full copy')
         addLog('but future copies will only be changes')
     else:    
@@ -1331,7 +1334,7 @@ def snapshot(path='.',force=False,excludes=[],prune=False,snap=True):
         linkDir = snapDestDir + sorted(oldSnaps)[-1] # Newest
     
         RsyncFlags += ['--link-dest={:s}'.format(linkDir)]
-        output = subprocess.check_output(['rsync']+RsyncFlags + [path,snapDest],stderr=DEVNULL)
+        output = _check_output(['rsync']+RsyncFlags + [path,snapDest],return_err=False)
         
         addLog(' Snapshot generated in {:s}'.format(snapDest))
         addLog('  Used {:s} to hard-link unchaged files'.format(linkDir))
@@ -1376,7 +1379,7 @@ def remoteSnap(path='.',excludes=[],prune=False,snap=True):
         else:
             excludeTXT = ' --prune-only ' + excludeTXT
     
-    cmd = 'ssh -T -q {:s} "{:s} snapshot {:s} --force {:s}"'.format(B_host,B_pathToPBrsync,excludeTXT,pathB)
+    cmd = 'ssh -T -q  -p {:d} {:s} "{:s} snapshot {:s} --force {:s}"'.format(SSH_port,B_host,B_pathToPBrsync,excludeTXT,pathB)
 
     addLog(' Calling:')
     addLog('  `{:s}`'.format(cmd))
@@ -1488,6 +1491,7 @@ def reset_configfile(path='.',force=False):
 #   host            :   user@host.name
 #   PBrsync         :   Path the the PBrsync.py file on remote 
 #                       machine
+#   SSH_port        :   Specify an SSH port. Default is 22
 #   
 #   If those are not specified, it assumes a local "remote" 
 #   machine 
@@ -1536,6 +1540,8 @@ path = /full/path/to/remote/dir/
 
 host = user@host
 PBrsync = /full/path/to/PBrsync.py
+
+SSH_port = 22
 
 [backups]
 # These are also the defaults if you remove them:
@@ -1599,6 +1605,44 @@ def resetfiles(path='.',force=False):
         F.write('1.01')
     
       
+
+def _check_output(cmd,return_err=False):
+    """
+    This is a bit hacked together since subprocesses seems buggy with
+    `-e "ssh -p XXXX"` commands.
+    
+    """
+    
+    outName = '/tmp/' + randomString(10)
+    errName = '/tmp/' + randomString(10)
+    
+    if type(cmd) is not type('string'):
+        cmd = ' '.join(cmd)
+    
+    cmd += ' > ' + outName + ' 2> ' + errName
+    
+    stat = os.system(cmd)
+    
+    if not stat == 0:
+        print 'Failed command:'
+        print '  ' + cmd
+        sys.exit(2)
+    
+    if return_err:
+        err = open(errName).read()
+    
+    out = open(outName).read()
+    
+    try:
+        os.remove(outName)
+        os.remove(errName)
+    except:
+        pass
+    
+    if return_err:
+        return out,err
+    
+    return out
 
 def usage(cmd=None):
     usageFull = """\
