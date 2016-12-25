@@ -2,14 +2,13 @@
 
 import os
 import shutil
-# import subprocess # Subprocesses doesn't like a lot of these commands. We just use os.system(cmd >out 2>err) type things. 
-import time
+import subprocess
 import sys
 from datetime import datetime,timedelta
 import getopt
 import string,random
 import ConfigParser
-
+import time
 try:
     import simplejson as json
 except:
@@ -141,8 +140,21 @@ def sync(path='.'):
     tmpLogSpace = 0
     
     ################
+    # A change is that we now try to stream the final sync so we can see what is happeneing
+    
+    tmpLogSpace = 0
+    addLog('')
+    addLog('-'*60)
+    addLog('Final rsync Transfer')
+    
+    
+    
+#     logRsyncFinal(A2B,B2A)
+#     tmpLogSpace = 0
     
     tmpFile = randomString(10)
+    
+    ## A >>> B
     
     rsyncFlag_FINAL = ['-v','--exclude-from',tmpFile,'--exclude',tmpFile]
     
@@ -150,28 +162,96 @@ def sync(path='.'):
         F.write('\n'.join(excludeA2B+excludeDirs+excludeNames+excludePaths))
     
     T0tmp = time.time()
-    A2B = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],return_err=False)
+    ####
+    #A2B = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],return_err=False)
+    
+    cmd = ['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync]
+    
+    # based on http://stackoverflow.com/a/17698359/3633154
+    p = subprocess.Popen(' '.join(cmd), stdout=subprocess.PIPE, bufsize=1,shell=True)
+
+    tmpLogSpace = 0
+    addLog('  A >>> B')
+    tmpLogSpace = 4
+    
+    A2B = ''
+    with p.stdout:
+        for line in iter(p.stdout.readline, b''):
+#             print ii,line
+            A2B += line
+            line = _proc_final_log(line)
+            if line is not None:
+                addLog(line.replace('\n','').strip())
+    p.wait() # wait for the subprocess to exit
+    ######
     nonPyTime += time.time() - T0tmp
+
+    ## A <<< B
 
     with open(tmpFile,'w') as F:
         F.write('\n'.join(excludeB2A+excludeDirs+excludeNames+excludePaths))
 
     T0tmp = time.time()
-    B2A = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],return_err=False)
-    nonPyTime += time.time() - T0tmp
-
-    os.remove(tmpFile)
+    ####
+    #B2A = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],return_err=False)
+    cmd = ['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA]
+    
+    # based on http://stackoverflow.com/a/17698359/3633154
+    p = subprocess.Popen(' '.join(cmd), stdout=subprocess.PIPE, bufsize=1,shell=True)
     
     tmpLogSpace = 0
-    addLog('')
-    addLog('-'*60)
-    addLog('Final rsync Transfer')
-    
+    addLog('  A <<< B')
     tmpLogSpace = 4
-    logRsyncFinal(A2B,B2A)
+    
+    B2A = ''
+    with p.stdout:
+        for line in iter(p.stdout.readline, b''):
+#             print ii,line
+            B2A += line
+            line = _proc_final_log(line)
+            if line is not None:
+                addLog(line.replace('\n','').strip())
+    p.wait() # wait for the subprocess to exit
+    ########
+    
+    nonPyTime += time.time() - T0tmp
     tmpLogSpace = 0
+
+    try:
+        os.remove(tmpFile)
+    except:
+        pass
     
     cleanup()
+
+def _proc_final_log(line):
+    if len(line.strip()) == 0: return None 
+    action_path = [i.strip() for i in line.split(' ',1)]
+    if len(action_path) != 2:
+        return 'Something Wrong with final action: {:s}'.format(line)
+        
+    action = action_path[0]
+    path = action_path[1]    
+    
+    
+    action = action.replace('<','>')
+    
+    if path.find('.JWempty') != -1: return None
+    
+    
+    if action.startswith('sent') or action.startswith('total'):
+        return line
+    
+    if any([action.startswith(d) for d in ['receiving','building']]):
+        return None
+
+    if action.startswith('>'):  return 'Transfer  ' + path
+    if action.startswith('cd'): return 'mkdir     ' + path
+    if action.startswith('.'):  return None
+    if action.startswith('*deleting'): return 'delete    ' + path
+    
+    return line
+    
 
 def pushpull(path,pushpull,delete=False):
     assert pushpull in ['push','pull']
@@ -201,18 +281,47 @@ def pushpull(path,pushpull,delete=False):
     if delete:
         rsyncFlag_FINAL.append('--delete')    
     
-    if pushpull == 'pull':
-        B2A = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],return_err=False)
-        A2B = ''
-    elif pushpull == 'push':
-        A2B = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],return_err=False)
-        B2A = ''
-    
     addLog('rsync Transfer')
-    tmpLogSpace = 4
-    logRsyncFinal(A2B,B2A)
-    tmpLogSpace = 0
+    
+    if pushpull == 'pull':
+        # B2A = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA],return_err=False)
+        cmd = ['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathBrsync,pathA]
+    
+        p = subprocess.Popen(' '.join(cmd), stdout=subprocess.PIPE, bufsize=1,shell=True)
+    
+        tmpLogSpace = 0
+        addLog('  A <<< B')
+        tmpLogSpace = 4
+    
+        B2A = ''
+        with p.stdout:
+            for line in iter(p.stdout.readline, b''):
+    #             print ii,line
+                B2A += line
+                line = _proc_final_log(line)
+                if line is not None:
+                    addLog(line.replace('\n','').strip())
+        p.wait() # wait for the subprocess to exit      
+    elif pushpull == 'push':
+        # A2B = _check_output(['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync],return_err=False)
+        cmd = ['rsync'] + rsyncFlags_ALL + rsyncFlag_FINAL + [pathA,pathBrsync]
+        p = subprocess.Popen(' '.join(cmd), stdout=subprocess.PIPE, bufsize=1,shell=True)
 
+        tmpLogSpace = 0
+        addLog('  A >>> B')
+        tmpLogSpace = 4
+    
+        A2B = ''
+        with p.stdout:
+            for line in iter(p.stdout.readline, b''):
+    #             print ii,line
+                A2B += line
+                line = _proc_final_log(line)
+                if line is not None:
+                    addLog(line.replace('\n','').strip())
+        p.wait() # wait for the subprocess to exit
+    
+    tmpLogSpace = 0    
     cleanup()
 def start():
     
@@ -881,45 +990,6 @@ def GetMatchingFile(file_list,file_or_attribute,attribute='path'):
     
     return None
 
-def logRsyncFinal(A2B,B2A):
-    for log,dir in zip([A2B,B2A],['A >>> B','A <<< B']):
-        addLog(dir)
-        for item in log.split('\n'):
-            if len(item)<2:
-                continue
-            
-            
-            action_path = [i.strip() for i in item.split(' ',1)]
-            if len(action_path) != 2:
-                addLog('Something Wrong with final action: {:s}'.format(item))
-                continue
-                
-            action = action_path[0]
-            path = action_path[1]    
-            
-            
-            action = action.replace('<','>')
-            
-            if path.find('.JWempty') != -1: continue
-            
-            txt = ''
-            
-            if action.startswith('sent') or action.startswith('total'):
-                addLog('  ' + item)
-                continue
-            
-            if any([action.startswith(d) for d in ['receiving','building']]):
-                continue
-
-            if len(item.strip()) == 0: continue 
-                
-            if action.startswith('>'): txt +=          'Transfer  ' + path
-            elif action.startswith('cd'): txt +=       'mkdir     ' + path
-            elif action.startswith('.'): continue
-            elif action.startswith('*deleting'): txt +='delete    ' + path
-            else:  txt += action + ' ' + path
-            
-            addLog(txt,space=2)
 
 def CompareRsyncResults(A2B,B2A,curListA,oldListA,curListB,oldListB):
     """
@@ -1608,41 +1678,56 @@ def resetfiles(path='.',force=False):
 
 def _check_output(cmd,return_err=False):
     """
+    ORIGINAL
     This is a bit hacked together since subprocesses seems buggy with
     `-e "ssh -p XXXX"` commands.
     
+    MOD: based on http://stackoverflow.com/a/17698359/3633154
+    
     """
     
-    outName = '/tmp/' + randomString(10)
-    errName = '/tmp/' + randomString(10)
-    
+    # outName = '/tmp/' + randomString(10)
+#     errName = '/tmp/' + randomString(10)
+#     
+#     if type(cmd) is not type('string'):
+#         cmd = ' '.join(cmd)
+#     
+#     cmd += ' > ' + outName + ' 2> ' + errName
+#     
+#     stat = os.system(cmd)
+#     
+#     if not stat == 0:
+#         print 'Failed command:'
+#         print '  ' + cmd
+#         sys.exit(2)
+#     
+#     if return_err:
+#         err = open(errName).read()
+#     
+#     out = open(outName).read()
+#     
+#     try:
+#         os.remove(outName)
+#         os.remove(errName)
+#     except:
+#         pass
+#     
+#     if return_err:
+#         return out,err
+#     
+#     return out
+
     if type(cmd) is not type('string'):
         cmd = ' '.join(cmd)
-    
-    cmd += ' > ' + outName + ' 2> ' + errName
-    
-    stat = os.system(cmd)
-    
-    if not stat == 0:
-        print 'Failed command:'
-        print '  ' + cmd
-        sys.exit(2)
-    
-    if return_err:
-        err = open(errName).read()
-    
-    out = open(outName).read()
-    
-    try:
-        os.remove(outName)
-        os.remove(errName)
-    except:
-        pass
-    
-    if return_err:
-        return out,err
-    
-    return out
+
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=1,shell=True)
+
+    txt = ''
+    with p.stdout:
+        for line in iter(p.stdout.readline, b''):
+            txt += line
+    p.wait() # wait for the subprocess to exit
+    return txt
 
 def usage(cmd=None):
     usageFull = """\
