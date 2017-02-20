@@ -1,3 +1,17 @@
+# NOTE: New version coming soon!!!
+
+I completely rewrote this tool from the ground up to be *much* more robust! The new version does not rely on rsync idiosyncrasies (though still uses it for transfers). It can handle more edge cases and may be eventually expanded to use other back ends.
+
+In addition, it has an extensive text suite including cases that this tool would fail.
+
+The current tool still works, but I would **highly** suggest waiting. As of 2017-02-19, the ETA is a week or two. I am hoping to make it work on Python3 as well but it needs to be tested
+
+-----
+
+-----
+
+-----
+
 # `PBrsync` --  Python Wrapper for Bidirectional `rsync` 
 
 `PBrsync` is a wrapper around multiple `rsync` calls and a small inode-based file tracker. It performs bi-directional synchronization, tracks and propogates file moves (and renames) and has two integrated backup strategies.
