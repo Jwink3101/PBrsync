@@ -1,5 +1,7 @@
 # NOTE: New version coming soon!!!
 
+See [PyFiSync](https://github.com/Jwink3101/PyFiSync)
+
 I completely rewrote this tool from the ground up to be *much* more robust! The new version does not rely on rsync idiosyncrasies (though still uses it for transfers). It can handle more edge cases and may be eventually expanded to use other back ends.
 
 In addition, it has an extensive text suite including cases that this tool would fail.
